@@ -45,16 +45,21 @@ def check_insecure_forms(soup, page_url):
             vulnerabilities["insecure_forms"].add(path)
 
 MAX_PAGES = 10
+pages_scanned = 0
+
 def crawl(url, base_domain):
-    if len(visited) >= MAX_PAGES:
+    global pages_scanned
+    if len(visited) >= MAX_PAGES or pages_scanned >= MAX_PAGES:
         return
     if url in visited or not url.startswith(base_domain):
         return
-    visited.add(url)
 
     try:
         response = requests.get(url, timeout=5)
         response.raise_for_status()
+        visited.add(url)
+        pages_scanned += 1
+
         soup = BeautifulSoup(response.text, "html.parser")
 
         check_security_headers(response.headers)
@@ -67,13 +72,12 @@ def crawl(url, base_domain):
 
     except requests.RequestException as e:
         print(f"Error accessing {url}: {e}")
-        pass
 
 def generate_report(domain):
-    print(f"VULNERABILITY SCAN REPORT FOR {domain.upper()}:")
+    print(f"\nVULNERABILITY SCAN REPORT FOR {domain.upper()}:")
 
     for h in vulnerabilities["missing_headers"]:
-        print(f"- MISSING HTTP SECURITY HEADERS: {h}")
+        print(f"- MISSING HTTP SECURITY HEADER: {h}")
 
     for software in vulnerabilities["outdated_software"]:
         print(f"- OUTDATED SOFTWARE VERSION DETECTED: {software}")
@@ -91,4 +95,8 @@ if __name__ == "__main__":
         base_domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
         print(f"Starting scan on {base_domain}...\n")
         crawl(start_url, base_domain)
-        generate_report(base_domain)
+
+        if pages_scanned > 0:
+            generate_report(base_domain)
+        else:
+            print(f"\nScan could not be completed. The site {base_domain} is unreachable or invalid.")
